@@ -1,0 +1,156 @@
+<head>
+	<title>GLPK Demo</title>
+</head>
+
+<body>
+	{{> DemoLP}}
+	<hr>
+	{{> DemoMPL}}
+</body>
+
+
+<template name="DemoLP">
+	<h3>LP Problem</h3>
+	<textarea class="ui textarea" id="source" style="width: 100%; font-family: Courier New;" rows="20"></textarea>
+	
+	<div>
+		<input class="ui checkbox mip" type="checkbox"> MIP
+	</div>
+	
+	<div>
+		<button class="ui button" id="go-lp" {{goButtonState}}>Go</button>
+		<button class="ui button stop" {{stopButtonState}}>Stop</button>
+		<button class="ui button new-problem" {{goButtonState}}>Pick Random Sample Problem</button>
+		<button class="ui button clear" {{goButtonState}}>Clear</button>
+	</div>
+	
+	<h4>Log</h4>
+	<pre id="log" style="background-color: #eee; border-radius: 10px; padding: 10px;">{{#each log}}{{this}}{{/each}}</pre>
+
+	{{#if haveSolution}}
+		{{> ShowObjective objective}}
+		{{> ShowSolution solutions}}
+	{{/if}}
+</template>
+
+
+<template name="DemoMPL">
+	<h3>MPL Model</h3>
+	<textarea class="ui textarea" id="source-model" style="width: 100%; font-family: Courier New;" rows="20"></textarea>
+	
+	<h3>MPL Data</h3>
+	<textarea class="ui textarea" id="source-data" style="width: 100%; font-family: Courier New;" rows="20"></textarea>
+	
+	<div>
+		<input class="ui checkbox mip" type="checkbox" checked> MIP
+	</div>
+	
+	<div>
+		<button class="ui button" id="go-mpl" {{goButtonState}}>Go</button>
+		<button class="ui button stop" {{stopButtonState}}>Stop</button>
+		<button class="ui button new-problem" {{goButtonState}}>Pick Random Sample Problem</button>
+		<button class="ui button clear" {{goButtonState}}>Clear</button>
+	</div>
+	
+	<h4>Log</h4>
+	<pre id="mpl-log" style="background-color: #eee; border-radius: 10px; padding: 10px;">{{#each log}}{{this}}{{/each}}</pre>
+
+	{{#if haveSolution}}
+		{{> ShowObjective objective}}
+		{{> ShowSolution solutions}}
+	{{/if}}
+</template>
+
+<template name="ShowObjective">
+	<h3>Objective</h3>
+	<table border=1>
+		<thead>
+			<th>name</th>
+			<th>value</th>
+			<th>direction</th>
+			<th>sol. status</th>
+			<th>primal status</th>
+			<th>dual status</th>
+			<th>return code</th>
+		</thead>
+		<tbody>
+			{{#each this}}
+				<tr>
+					<td>{{name}}</td>
+					<td>{{value}}</td>
+					<td>{{direction}}</td>
+					<td>{{status}}</td>
+					<td>{{primal_status}}</td>
+					<td>{{dual_status}}</td>
+					<td>{{return_code}}</td>
+				</tr>
+			{{/each}}
+		</tbody>
+	</table>
+</template>
+
+<template name="ShowSolution">
+	{{#each this}}
+		<h3>{{type}} Solution</h3>
+
+		<h4>Rows ({{type}})</h4>
+		<table border=1>
+			<thead>
+				<tr>
+					<th>name</th>
+					<th>type</th>
+					<th>lb</th>
+					<th>ub</th>
+					<th>stat</th>
+					<th>primal</th>
+					<th>dual</th>
+				</tr>
+			</thead>
+			<tbody>
+				{{#each rows}}
+					<tr>
+						<td style="font-family: Courier New;">{{name}}</td>
+						<td>{{varType type}} ({{type}})</td>
+						<td>{{lb}}</td>
+						<td>{{ub}}</td>
+						<td>{{varStatus stat}} ({{stat}})</td>
+						<td>{{primal}}</td>
+						<td>{{dual}}</td>
+					</tr>
+				{{/each}}
+			</tbody>
+		</table>
+
+		<h4>Columns ({{type}})</h4>
+		<table border=1>
+			<thead>
+				<tr>
+					<th>name</th>
+					<th>type</th>
+					<th>stat</th>
+					<th>obj. coeff</th>
+					<th>lb</th>
+					<th>ub</th>
+					<th>primal</th>
+					<th>dual</th>
+					<th>kind</th>
+				</tr>
+			</thead>
+			<tbody>
+				{{#each cols}}
+					<tr>
+						<td style="font-family: Courier New;">{{name}}</td>
+						<td>{{varType type}} ({{type}})</td>
+						<td>{{varStatus stat}} ({{stat}})</td>
+						<td>{{objCoeff}}</td>
+						<td>{{lb}}</td>
+						<td>{{ub}}</td>
+						<td>{{primal}}</td>
+						<td>{{dual}}</td>
+						<td>{{colKind kind}}</td>
+					</tr>
+				{{/each}}
+			</tbody>
+		</table>
+	{{/each}}
+</template>
