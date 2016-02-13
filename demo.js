@@ -109,7 +109,7 @@ if (Meteor.isClient) {
 
 		function intOptCB(instance, info) {
 			if (INTOPT_EVENTS.includes(info.reason)) {
-				var message = `[INTOPT|${instance.view.name}|${info.iterationCount}] ${info.reasonDescription}; Obj: ${info.mipObjective} (#cb: ${info.numCallbacks})`;
+				var message = `[INTOPT|${instance.view.name}|${info.iterationCount}] ${info.reasonDescription}; Obj: ${info.mipObjective} (gap: ${info.gap}; #cb: ${info.numCallbacks})`;
 				console.info(message);
 				instance.appendToLog(message);
 			}
