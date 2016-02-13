@@ -33,6 +33,7 @@ function trimExcess(textLines, tabwidth = 4) {
     return textBlocks.map(s => lessLeadingCharacters(s, minLeadingSpaces)).join('\n');
 }
 
+
 lpSampleProblems = [
     `
         \\* Objective function *\\
@@ -1820,6 +1821,702 @@ mplSampleProblems = [
             end;
         `
     },
+    {
+        model: `
+            # Traveling Salesman Problem with Time Windows
+
+            param start symbolic;
+            param finish symbolic, != start;
+            param maxspeed;
+
+            set PLACES;
+            param lat{PLACES};
+            param lng{PLACES};
+            param S1{PLACES};
+            param S2{p in PLACES} >= S1[p];
+
+            # compute great circle distances and minimum travel times
+            param d2r := 3.1415926/180;
+            param alpha{a in PLACES, b in PLACES} := sin(d2r*(lat[a]-lat[b])/2)**2 
+                  + cos(d2r*lat[a])*cos(d2r*lat[b])*sin(d2r*(lng[a]-lng[b])/2)**2;
+            param gcdist{a in PLACES, b in PLACES} := 2*6371*atan(sqrt(alpha[a,b]),sqrt(1-alpha[a,b]));
+
+            # Path constraints
+            var x{PLACES, PLACES} binary;
+
+            # must leave from all nodes except the finish node
+            s.t. lv1 {a in PLACES : a != finish}: sum{b in PLACES} x[a,b] = 1;
+            s.t. lv2 : sum{b in PLACES} x[finish,b] = 0;
+
+            # must arrive at all places except the start node
+            s.t. ar1 {a in PLACES : a != start}: sum{b in PLACES} x[b,a] = 1;
+            s.t. ar2 : sum{b in PLACES} x[b,start] = 0;
+
+            # subtour elimination using an idea from Andrew O. Makhorin
+            var y{PLACES, PLACES} >= 0, integer;
+            s.t. capbnd {a in PLACES, b in PLACES} : y[a,b] <= (card(PLACES)-1)*x[a,b];
+            s.t. capcon {a in PLACES} : sum{b in PLACES} y[b,a] 
+                     + (if a=start then card(PLACES)) = 1 + sum{b in PLACES} y[a,b];
+
+            # Time Constraints
+            param bigM := 50;
+            var tar{PLACES};         # arrival
+            var tlv{PLACES};         # departure
+            var tea{PLACES} >= 0;    # early arrival (arrival before the designated time window)
+            var tla{PLACES} >= 0;    # late arrival (arrival after the designated time window)
+            var ted{PLACES} >= 0;    # early departure (departure before the designated time window)
+            var tld{PLACES} >= 0;    # late departure (departure after the designated time window)
+
+            s.t. t1 {a in PLACES} : tlv[a] >= tar[a]; 
+            s.t. t2 {a in PLACES, b in PLACES} : 
+                    tar[b] >= tlv[a] + gcdist[a,b]/maxspeed - bigM*(1-x[a,b]);
+            s.t. t3 {a in PLACES : a != start } : tea[a] >= S1[a] - tar[a];   # early arrival
+            s.t. t4 {a in PLACES : a != start } : tla[a] >= tar[a] - S2[a];   # late arrival
+            s.t. t5 {a in PLACES : a != finish} : ted[a] >= S1[a] - tlv[a];   # early departure
+            s.t. t6 {a in PLACES : a != finish} : tld[a] >= tlv[a] - S2[a];   # late departure
+
+            # the objective is weighted sum of average and maximum time window excursions
+            var tmax >= 0;
+            s.t. o1 {a in PLACES} : tea[a] <= tmax;
+            s.t. o2 {a in PLACES} : tla[a] <= tmax;
+            s.t. o3 {a in PLACES} : ted[a] <= tmax;
+            s.t. o4 {a in PLACES} : tld[a] <= tmax;
+
+            minimize obj: sum{a in PLACES} (1*tea[a] + 2*tla[a] + 2*ted[a] + 1*tld[a]) + 2*tmax;
+
+            solve;
+
+            printf "%6s  %3s   %6s  %3s %6s %6s %6s %6s %7s %5s %6s\\n", 
+                'Depart','','Arrive','','EDep','LDep','EArr','LArr','Dist','Time','Speed';
+
+            for {k in card(PLACES)-1..0 by -1} {
+                printf {a in PLACES, b in PLACES : (y[a,b]=k) && (x[a,b]=1)}
+                    "%-3s %7.2f   %-3s %7.2f %6.2f%1s %5.2f%1s %5.2f%1s %5.2f%1s %6.1f %5.2f %6.1f\\n", 
+                    a, tlv[a], b, tar[b], 
+                    ted[a], if (ted[a]>0) then '*' else ' ',
+                    tld[a], if (tld[a]>0) then '*' else ' ',
+                    tea[b], if (tea[b]>0) then '*' else ' ',
+                    tla[b], if (tla[b]>0) then '*' else ' ',
+                    gcdist[a,b], (tar[b]-tlv[a]), gcdist[a,b]/(tar[b]-tlv[a]);
+            }
+
+            end;
+        `,
+        data: `
+            data;
+
+            param start := 'ATL';
+            param finish := 'ORD';
+            param maxspeed := 800;
+
+            param : PLACES :         lat            lng       S1       S2 :=
+                    ATL       33.6366995    -84.4278639      8.0     24.0
+                    BOS       42.3629722    -71.0064167      8.0      9.0
+                    DEN       39.8616667   -104.6731667     12.0     15.0
+                    DFW       32.8968281    -97.0379958     12.0     13.0
+                    JFK       40.6397511    -73.7789256     18.0     20.0
+                    LAX       33.9424955   -118.4080684     12.0     16.0
+                    ORD       41.9816486    -87.9066714     20.0     24.0
+                    STL       38.7486972    -90.3700289     11.0     13.0
+            ; 
+
+            end;
+        `
+    },
+    {
+        model: `
+            # Konno and Yamazaki (1990) proposed a linear programming model for
+            # portfolio optimization in which the risk measure is mean absolute
+            # deviation (MAD). This model computes a portfolio minimizing MAD
+            # subject to a lower bound on return.
+
+            # In contrast to the classical Markowitz portfolio, the MAD criterion
+            # requires a data set consisting of returns on the investment assets.
+            # The data set may be an historical record or samples from a 
+            # multivariate statistical model of portfolio returns. The MAD criterion
+            # produces portfolios with properties not shared by the Markowitz portfolio,
+            # including second degree stochastic dominance.
+
+            # Below we demonstrate portfolio optimization with the MAD criterion
+            # where data is generated by sampling a multivariate normal distribution.
+            # Given mean return r and the Cholesky decomposition of the covariance matrix 
+            # Σ (i.e., C such that CCT=Σ ), we compute rt=r+Czt where the elements
+            # of zt are zero mean normal variates with unit variance.
+
+            # The rest of the formulation is adapted from "Optimization Methods
+            # in Finance" by Gerald Curnuejols and Reha Tutuncu (2007) which, in
+            # turn, follows an implementation due to Fienstein and Thapa (1993).
+            # A complete tutorial on the implementation of this model is available
+            # on GLPK wikibook. A complete tutorial describing the implementation of
+            # this model is available on GLPK wikibook.
+            # http://en.wikibooks.org/wiki/GLPK/Portfolio_Optimization
+
+            # Example: PortfolioMAD.mod  Portfolio Optimization using Mean Absolute Deviation
+
+            /* Stock Data */
+
+            set S;                                    # Set of stocks
+            param r{S};                               # Means of projected returns
+            param cov{S,S};                           # Covariance of projected returns
+            param r_portfolio
+                default (1/card(S))*sum{i in S} r[i]; # Lower bound on portfolio return
+
+            /* Generate sample data */
+
+            /* Cholesky Lower Triangular Decomposition of the Covariance Matrix */
+            param c{i in S, j in S : i >= j} := 
+                if i = j then
+                    sqrt(cov[i,i]-(sum {k in S : k < i} (c[i,k]*c[i,k])))
+                else
+                    (cov[i,j]-sum{k in S : k < j} c[i,k]*c[j,k])/c[j,j];
+
+            /* Because there is no way to seed the PRNG, a workaround */
+            param utc := prod {1..2} (gmtime()-1000000000);
+            param seed := utc - 100000*floor(utc/100000);
+            check sum{1..seed} Uniform01() > 0;
+
+            /* Normal random variates */
+            param N default 5000;
+            set T := 1..N;
+            param zn{j in S, t in T} := Normal(0,1);
+            param rt{i in S, t in T} := r[i] + sum {j in S : j <= i} c[i,j]*zn[j,t];
+
+            /* MAD Optimization */
+
+            var w{S} >= 0;                # Portfolio Weights with Bounds
+            var y{T} >= 0;                # Positive deviations (non-negative)
+            var z{T} >= 0;                # Negative deviations (non-negative)
+
+            minimize MAD: (1/card(T))*sum {t in T} (y[t] + z[t]);
+
+            s.t. C1: sum {s in S} w[s]*r[s] >= r_portfolio;
+            s.t. C2: sum {s in S} w[s] = 1;
+            s.t. C3 {t in T}: (y[t] - z[t]) = sum{s in S} (rt[s,t]-r[s])*w[s];
+
+            solve;
+
+            /* Report */
+
+            /* Input Data */
+            printf "Stock Data\\n\\n";
+            printf "         Return   Variance\\n";
+            printf {i in S} "%5s   %7.4f   %7.4f\\n", i, r[i], cov[i,i];
+
+            printf "\\nCovariance Matrix\\n\\n";
+            printf "     ";
+            printf {j in S} " %7s ", j;
+            printf "\\n";
+            for {i in S} {
+                printf "%5s  " ,i;
+                printf {j in S} " %7.4f ", cov[i,j];
+                printf "\\n";
+            }
+
+            /* MAD Optimal Portfolio */
+            printf "\\nMinimum Absolute Deviation (MAD) Portfolio\\n\\n";
+            printf "  Return   = %7.4f\\n",r_portfolio;
+            printf "  Variance = %7.4f\\n\\n", sum {i in S, j in S} w[i]*w[j]*cov[i,j];
+            printf "         Weight\\n";
+            printf {s in S} "%5s   %7.4f\\n", s, w[s];
+            printf "\\n";
+
+            /* Simulated Return data in Matlab Format */
+            /*
+            printf "\\nrt = [ ... \\n";
+            for {t in T} {
+               printf {s in S} "%9.4f",rt[s,t];
+               printf "; ...\\n";
+            }
+            printf "];\\n\\n";
+            */
+
+            end;
+        `,
+        data: `
+            data;
+
+            /* Data for monthly returns on four selected stocks for a three
+            year period ending December 4, 2009 */
+
+            param N := 200;
+
+            param r_portfolio := 0.01;
+
+            param : S : r :=
+                AAPL    0.0308
+                GE     -0.0120
+                GS      0.0027
+                XOM     0.0018 ;
+
+            param   cov : 
+                        AAPL    GE      GS      XOM  :=
+                AAPL    0.0158  0.0062  0.0088  0.0022
+                GE      0.0062  0.0136  0.0064  0.0011
+                GS      0.0088  0.0064  0.0135  0.0008
+                XOM     0.0022  0.0011  0.0008  0.0022 ;
+
+            end;
+        `
+    },
+    {
+        model: `
+            /* Example: JobShop.mod */
+
+            /*
+            A simple job shop consists of a set of different machines that process jobs. Each job
+            consists of series of tasks that must be completed in specified order on the machines.
+            The problem is to schedule the jobs on the machines to minimize makespan.
+
+            Data consists of two tables. The first table is decomposition of the jobs into a series
+            of tasks. Each task lists a job name, name of the required machine, and task duration.
+            The second table list task pairs where the first task must be completed before the
+            second task can be started. This formulation is quite general, but can also specify
+            situations with no feasible solutions.
+            */
+
+            /* Data Table 1. Tasks consist of Job, Machine, Dur data*/
+            set TASKS dimen 2;
+            param dur{TASKS};
+
+            /* Data Table 2 */
+            set TASKORDER within {TASKS,TASKS};
+
+            /* JOBS and MACHINES are inferred from the data tables*/
+            set JOBS := setof {(j,m) in TASKS} j;
+            set MACHINES := setof {(j,m) in TASKS} m;
+
+            /* Decision variables are start times for tasks, and the makespan */
+            var start{TASKS} >= 0;
+            var makespan >= 0;
+
+            /* BigM is set to be bigger than largest possible makespan */
+            param BigM := 1 + sum {(j,m) in TASKS} dur[j,m];
+
+            /* The primary objective is to minimize makespan, with a secondary
+            objective of starting tasks as early as possible */
+            minimize OBJ: BigM*makespan + sum{(j,m) in TASKS} start[j,m];
+
+            /* By definition, all jobs must be completed within the makespan */
+            s.t. A {(j,m) in TASKS}: start[j,m] + dur[j,m] <= makespan;
+
+            /* Must satisfy any orderings that were given for the tasks. */
+            s.t. B {(k,n,j,m) in TASKORDER}: start[k,n] + dur[k,n] <= start[j,m];
+
+            /* Eliminate conflicts if tasks are require the same machine */
+            /* y[i,m,j] = 1 if Job i is scheduled before job j on machine m*/
+            var y{(i,m) in TASKS,(j,m) in TASKS: i < j} binary;
+            s.t. C {(i,m) in TASKS,(j,m) in TASKS: i < j}:
+               start[i,m] + dur[i,m] <= start[j,m] + BigM*(1-y[i,m,j]);
+            s.t. D {(i,m) in TASKS,(j,m) in TASKS: i < j}:
+               start[j,m] + dur[j,m] <= start[i,m] + BigM*y[i,m,j];
+
+            solve;
+
+            printf "Makespan = %5.2f\\n",makespan;
+
+            /* Post solution, compute finish times for each task to use in report */
+            param finish{(j,m) in TASKS} := start[j,m] + dur[j,m];
+
+            /* Task Summary Report */
+            printf "\\n                TASK SUMMARY\\n";
+            printf "\\n     JOB   MACHINE     Dur   Start  Finish\\n";
+            printf {(i,m) in TASKS} "%8s  %8s   %5.2f   %5.2f   %5.2f\\n", 
+               i, m, dur[i,m], start[i,m], finish[i,m];
+
+            /* Schedule of activities for each job */
+            set M{j in JOBS} := setof {(j,m) in TASKS} m;
+            param r{j in JOBS, m in M[j]} := 
+               1+sum{n in M[j]: start[j,n] < start[j,m] || start[j,n]==start[j,m] && n < m} 1;
+            printf "\\n\\n           JOB SCHEDULES\\n";
+            for {j in JOBS} {
+               printf "\\n%s:\\n",j;
+               printf "         MACHINE   Start   Finish\\n";
+               printf {k in 1..card(M[j]), m in M[j]: k==r[j,m]} 
+                  " %15s   %5.2f    %5.2f\\n",m, start[j,m],finish[j,m];
+            }
+
+            /* Schedule of activities for each machine */
+            set J{m in MACHINES} := setof {(j,m) in TASKS} j;
+            param s{m in MACHINES, j in J[m]} := 
+               1+sum{k in J[m]: start[k,m] < start[j,m] || start[k,m]==start[j,m] && k < j} 1;
+            printf "\\n\\n         MACHINE SCHEDULES\\n";
+            for {m in MACHINES} {
+               printf "\\n%s:\\n",m;
+               printf "             JOB   Start   Finish\\n";
+               printf {k in 1..card(J[m]), j in J[m]: k==s[m,j]} 
+                  " %15s   %5.2f    %5.2f\\n",j, start[j,m],finish[j,m];
+            }
+
+            end;
+        `,
+        data: `
+            data;
+
+            /* Job shop data from Christelle Gueret, Christian Prins,  Marc Sevaux,
+            "Applications of Optimization with Xpress-MP," Chapter 5, Dash Optimization, 2000. */
+
+            /* Jobs are broken down into a list of tasks (j,m), each task described by
+            job name j, machine name m, and duration dur[j,m] */
+
+            param: TASKS: dur :=
+               Paper_1  Blue    45
+               Paper_1  Yellow  10
+               Paper_2  Blue    20
+               Paper_2  Green   10
+               Paper_2  Yellow  34
+               Paper_3  Blue    12
+               Paper_3  Green   17
+               Paper_3  Yellow  28 ;
+
+            /* List task orderings (k,n,j,m) where task (k,n) must proceed task (j,n) */
+
+            set TASKORDER :=
+               Paper_1 Blue    Paper_1 Yellow
+               Paper_2 Green   Paper_2 Blue
+               Paper_2 Blue    Paper_2 Yellow
+               Paper_3 Yellow  Paper_3 Blue
+               Paper_3 Blue    Paper_3 Green ;
+
+            end;
+        `
+    },
+    {
+        model: `
+            # Example: ProjectCPM.mod
+
+            /*
+            The Critical Path Method is a technique for calculating the shortest time span needed to
+            complete a series of tasks. The tasks are represented by nodes, each labelled with the
+            duration. The precedence order of the task is given by a set of arcs.
+
+            Here we demonstrate the representation and calculation of the critical path.
+            Decision variables are introduced for
+
+             - Earliest Start
+             - Earliest Finish
+             - Latest Start
+             - Latest Finish
+             - Slack = Earliest Finish - Earliest Start = Latest Finish - Earliest Finish
+
+            Tasks on the Critical Path have zero slack.
+            */
+
+            set TASKS;
+            set ARCS within {TASKS cross TASKS};
+
+            /* Parameters are the durations for each task */
+            param dur{TASKS} >= 0;
+
+            /* Decision Variables associated with each task*/
+            var Tes{TASKS} >= 0;     # Earliest Start
+            var Tef{TASKS} >= 0;     # Earliest Finish
+            var Tls{TASKS} >= 0;     # Latest Start
+            var Tlf{TASKS} >= 0;     # Latest Finish
+            var Tsl{TASKS} >= 0;     # Slacks
+
+            /* Global finish time */
+            var Tf >= 0;
+
+            /* Minimize the global finish time and, secondarily, maximize slacks */
+            minimize ProjectFinish : card(TASKS)*Tf - sum {j in TASKS} Tsl[j];
+
+            /* Finish is the least upper bound on the finish time for all tasks */
+            s.t. Efnsh {j in TASKS} : Tef[j] <= Tf;
+            s.t. Lfnsh {j in TASKS} : Tlf[j] <= Tf;
+
+            /* Relationship between start and finish times for each task */
+            s.t. Estrt {j in TASKS} : Tef[j] = Tes[j] + dur[j];
+            s.t. Lstrt {j in TASKS} : Tlf[j] = Tls[j] + dur[j];
+
+            /* Slacks */
+            s.t. Slack {j in TASKS} : Tsl[j] = Tls[j] - Tes[j];
+
+            /* Task ordering */
+            s.t. Eordr {(i,j) in ARCS} : Tef[i] <= Tes[j];
+            s.t. Lordr {(j,k) in ARCS} : Tlf[j] <= Tls[k];
+
+            /* Compute Solution  */
+            solve;
+
+            /* Print Report */
+            printf 'PROJECT LENGTH = %8g\\n',Tf;
+
+            /* Critical Tasks are those with zero slack */
+
+            /* Rank-order tasks on the critical path by earliest start time */
+            param r{j in TASKS : Tsl[j] = 0} := sum{k in TASKS : Tsl[k] = 0}
+               if (Tes[k] <= Tes[j]) then 1;
+
+            printf '\\nCRITICAL PATH\\n';
+            printf '    TASK    DUR     Start    Finish\\n';
+            printf {k in 1..card(TASKS), j in TASKS : Tsl[j]=0 && k==r[j]}
+               '%8s %6g  %8g  %8g\\n', j, dur[j], Tes[j], Tef[j];
+
+            /* Noncritical Tasks have positive slack */
+
+            /* Rank-order tasks not on the critical path by earliest start time */
+            param s{j in TASKS : Tsl[j] > 0} := sum{k in TASKS : Tsl[k] = 0}
+               if (Tes[k] <= Tes[j]) then 1;
+
+            printf '\\nNON-CRITICAL TASKS\\n';
+            printf '                 Earliest  Earliest    Latest    Latest \\n';
+            printf '    TASK    DUR     Start    Finish     Start    Finish     Slack\\n';
+            printf {k in 1..card(TASKS), j in TASKS : Tsl[j] > 0 && k==s[j]}
+               '%8s %6g  %8g  %8g  %8g  %8g  %8g\\n', 
+               j,dur[j],Tes[j],Tef[j],Tls[j],Tlf[j],Tsl[j];
+            printf '\\n';
+
+            end;
+        `,
+        data: `
+            data;
+
+            /* Stadium Construction Example from Christelle Gueret, Christian Prins, 
+            Marc Sevaux, "Applications of Optimization with Xpress-MP," Chapter 5,
+            Dash Optimization, 2000. */ 
+
+            param : TASKS : dur :=
+               T01   2.0
+               T02  16.0
+               T03   9.0
+               T04   8.0
+               T05  10.0
+               T06   6.0
+               T07   2.0
+               T08   2.0
+               T09   9.0
+               T10   5.0
+               T11   3.0
+               T12   2.0
+               T13   1.0
+               T14   7.0
+               T15   4.0
+               T16   3.0
+               T17   9.0
+               T18   1.0 ;
+
+            set ARCS := 
+               T01  T02
+               T02  T03
+               T02  T04
+               T02  T14
+               T03  T05
+               T04  T07
+               T04  T10
+               T04  T09
+               T04  T06
+               T04  T15
+               T05  T06
+               T06  T09
+               T06  T11
+               T06  T08
+               T07  T13
+               T08  T16
+               T09  T12
+               T11  T16
+               T12  T17
+               T14  T16
+               T14  T15
+               T17  T18 ;
+
+            end;
+        `
+    },
+    {
+        model: `
+            /* Machine Bottleneck Example */
+
+            /*
+
+            The task is to schedule a set of jobs on a single machine given the release time, duration,
+            and due time for each job.
+            */
+
+            set JOBS;
+
+            param rel{JOBS} default 0;   # Time a job is available to the machine
+            param dur{JOBS};             # Job duration
+            param due{JOBS};             # Job due time
+
+            /* Data Checks */
+            check {k in JOBS}: rel[k] + dur[k] <= due[k];
+
+            /* The model uses a 'Big M' implementation of disjunctive constraints
+            to avoid conflicts for a single machine.  Big M should be larger than
+            the longest time horizon for the completion of all jobs. A bound
+            on the longest horizon is the maximum release plus the sum of
+            durations for all jobs. */
+
+            param BigM := (max {k in JOBS} rel[k] ) + sum{k in JOBS} dur[k];
+
+            /* Decision variables are the start times for each job, and a
+            disjunctive variable y[j,k] which is 1 if job j precedes job k on
+            the machine. */
+
+            var start{JOBS} >= 0;
+            var pastdue{JOBS} >= 0;
+            var y{JOBS,JOBS} binary;
+
+            /* There are many possible objectives, including total pastdue, maximum
+            pastdue (i.e., tardiness), number of jobs pastdue.  */
+
+            minimize OBJ : sum {k in JOBS} pastdue[k];
+
+            /* Order Constraints */
+
+            s.t. START {k in JOBS}: start[k] >= rel[k];
+            s.t. FINIS {k in JOBS}: start[k] + dur[k] <= due[k] + pastdue[k];
+
+            /* Machine Conflict Constraints */
+
+            s.t. DA {j in JOBS, k in JOBS : j < k}:
+               start[j] + dur[j] <= start[k] + BigM*(1-y[j,k]);
+            s.t. DB {j in JOBS, k in JOBS : j < k}:
+               start[k] + dur[k] <= start[j] + BigM*y[j,k];
+
+            solve;
+
+            /* Print Report */
+
+            printf " Task     Rel     Dur     Due   Start  Finish Pastdue\\n";
+            printf {k in JOBS} "%5s %7g %7g %7g %7g %7g %7g\\n",
+               k,rel[k],dur[k],due[k],start[k],start[k]+dur[k],pastdue[k];
+
+            end;
+        `,
+        data: `
+            data;
+
+            /* Machine Bottleneck Example from Christelle Gueret, Christian Prins,
+            Marc Sevaux, "Applications of Optimization with Xpress-MP," Chapter 5,
+            Dash Optimization, 2000. */
+
+            param: JOBS : rel   dur   due :=
+                     A      2     5    10
+                     B      5     6    21
+                     C      4     8    15
+                     D      0     4    10
+                     E      0     2     5
+                     F      8     3    15
+                     G      9     2    22 ;
+
+            end;
+        `
+    },
+    {
+        model: `
+            # Example: Newsvendor.mod
+
+            /*
+            The newsvendor problem is a two stage decision problem with recourse. The vendor needs to
+            decide how much inventory to order today to fulfill an uncertain demand. The data includes
+            the unit cost, price, and salvage value of the product being sold, and a probabilistic
+            forecast of demand. The objective is to maximize expected profit.
+
+            As shown in lecture, this problem can be solved with a plot, and the solution interpreted in
+            terms of a cumulative probability distribution. The advantage of a MathProg model is that
+            additional constraints or other criteria may be considered, such as risk aversion.
+
+            There is an extensive literature on the newsvendor problem which has been studied since at
+            least 1888. See here for a thorough discussion.
+            */
+
+            /* Unit Price Data */
+            param r >= 0;                              # Price
+            param c >= 0;                              # Cost
+            param w >= 0;                              # Salvage value
+
+            /* Price data makes sense only if  Price > Cost > Salvage */
+            check: c <= r;
+            check: w <= c;
+
+            /* Probabilistic Demand Forecast */
+            set SCENS;                                 # Scenarios
+            param D{SCENS} >= 0;                       # Demand
+            param Pr{SCENS} >= 0;                      # Probability
+
+            /* Probabilities must sum to one. */
+            check: sum{k in SCENS} Pr[k] = 1;
+
+            /* Expected Demand */
+            param ExD := sum{k in SCENS} Pr[k]*D[k];
+
+            /* Lower Bound on Profit: Expected Value of the Mean Solution */
+            param EVM := -c*ExD + sum{k in SCENS} Pr[k]*(r*min(ExD,D[k])+w*max(ExD-D[k],0));
+
+            /* Upper Bound on Profit: Expected Value with Perfect Information */
+            param EVPI := sum{k in SCENS} Pr[k]*(r-c)*D[k];
+
+            /* Two Stage Stochastic Programming */
+            var x >= 0;                     # Stage 1 (Here and Now): Order Quqntity
+            var y{SCENS}>= 0;               # Stage 2 (Scenario Dep): Actual Sales
+            var ExProfit;                   # Expected Profit
+
+            /* Maximize Expected Profit */
+            maximize OBJ: ExProfit;
+
+            /* Goods sold are limited by the order quantities and the demand  */
+            s.t. PRFT: ExProfit = -c*x + sum{k in SCENS} Pr[k]*(r*y[k] + w*(x-y[k]));
+            s.t. SUPL {k in SCENS}: y[k] <= x;
+            s.t. DMND {k in SCENS}: y[k] <= D[k];
+
+            solve; 
+
+            printf "EXPECTED VALUE OF THE MEAN SOLUTION\\n" >> "EVM";
+            printf "\\nSCENARIO     PROB   DEMAND    ORDER     SOLD  SALVAGE   PROFIT\\n" >> "EVM";
+            printf {k in SCENS} "%s     %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f\\n",
+               k, Pr[k], D[k], ExD, min(ExD,D[k]), max(ExD-D[k],0), 
+               -c*ExD + r*min(ExD,D[k]) + w*max(ExD-D[k],0) >> "EVM";
+            printf "\\n%s               %7.2f  %7.2f  %7.2f  %7.2f  %7.2f\\n",
+               'MEAN', ExD, ExD, sum{k in SCENS}Pr[k]*min(ExD,D[k]),
+               sum{k in SCENS}Pr[k]*max(ExD-D[k],0),EVM >> "EVM";
+
+            printf "EXPECTED VALUE WITH PERFECT INFORMATION\\n" >> "EVPI";
+            printf "\\nSCENARIO     PROB   DEMAND    ORDER     SOLD  SALVAGE   PROFIT\\n" >> "EVPI";
+            printf {k in SCENS} "%s     %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f\\n",
+               k, Pr[k], D[k], D[k], D[k], 0, -c*D[k] + r*D[k] >> "EVPI";
+            printf "\\n%s               %7.2f  %7.2f  %7.2f  %7.2f  %7.2f\\n",
+               'MEAN', ExD, ExD, ExD,0,EVPI >> "EVPI";
+
+            printf "TWO STAGE STOCHASTIC PROGRAMMING\\n\\n" >> "SP";
+            printf " Order Quantity = %g\\n", x >> "SP";
+            printf "Expected Profit = %g\\n", ExProfit >> "SP";
+            printf "\\nSCENARIO     PROB   DEMAND    ORDER     SOLD  SALVAGE   PROFIT\\n" >> "SP";
+            printf {k in SCENS} "%s     %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f\\n",
+               k, Pr[k], D[k], x, y[k], x-y[k], -c*x + r*y[k] + w*(x-y[k]) >> "SP";
+            printf "\\n%s               %7.2f  %7.2f  %7.2f  %7.2f  %7.2f\\n",
+               'MEAN', ExD, x, sum{k in SCENS}Pr[k]*y[k],
+               sum{k in SCENS}Pr[k]*(x-y[k]),ExProfit >> "SP";
+
+            printf "    VALUE OF PERFECT INFORMATION = %7.2f\\n",EVPI-ExProfit >> "Summary";
+            printf "VALUE OF THE STOCHASTIC SOLUTION = %7.2f\\n",ExProfit - EVM >> "Summary"; 
+
+            end;
+        `,
+        data: `
+            data;
+
+            /* Problem Data corresponds to a hypothetical case of selling programs prior 
+            to a home football game. */
+
+            param r := 10.00;                         # Unit Price
+            param c :=  6.00;                         # Unit Cost
+            param w :=  2.00;                         # Unit Salvage Value
+
+            param: SCENS:  Pr    D   :=
+                   HiDmd   0.25  250
+                   MiDmd   0.50  125
+                   LoDmd   0.25   75 ;
+
+            end;
+        `
+    },
+    // {
+    //     model: `
+    //     `,
+    //     data: `
+    //     `
+    // },
     // {
     //     model: `
     //     `,

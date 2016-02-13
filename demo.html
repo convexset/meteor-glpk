@@ -36,7 +36,7 @@
 		<button class="ui button clear" {{goButtonState}}>Clear</button>
 	</div>
 	
-	<h4>Log</h4>
+	<h4 class="log">Log</h4>
 	<pre id="log" style="background-color: #eee; border-radius: 10px; padding: 10px;">{{#each log}}{{this}}{{/each}}</pre>
 
 	{{#if haveSolution}}
@@ -51,7 +51,7 @@
 	<textarea class="ui textarea" id="source-model" style="width: 100%; font-family: Courier New;" rows="20"></textarea>
 	
 	<h3>MPL Data</h3>
-	<textarea class="ui textarea" id="source-data" style="width: 100%; font-family: Courier New;" rows="20"></textarea>
+	<textarea class="ui textarea" id="source-data" style="width: 100%; font-family: Courier New;" rows="10"></textarea>
 	
 	<div>
 		<input class="ui checkbox mip" type="checkbox" checked>&nbsp;MIP
@@ -66,7 +66,7 @@
 		<button class="ui button clear" {{goButtonState}}>Clear</button>
 	</div>
 	
-	<h4>Log</h4>
+	<h4 class="log">Log</h4>
 	<pre id="mpl-log" style="background-color: #eee; border-radius: 10px; padding: 10px;">{{#each log}}{{this}}{{/each}}</pre>
 
 	{{#if haveSolution}}

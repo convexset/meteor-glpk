@@ -8,6 +8,15 @@ if (Meteor.isClient) {
 		return ret;
 	}
 
+	function scrollTo(sel, scrollDuration = 500, initialDelay = 0, topDelta = 0) {
+		var instance = this;
+		setTimeout(function() {
+			$('html, body').animate({
+				scrollTop: instance.$(sel).offset().top + topDelta
+			}, scrollDuration);
+		}, initialDelay);
+	}
+
 	[
 		Template.DemoLP,
 		Template.DemoMPL,
@@ -74,12 +83,12 @@ if (Meteor.isClient) {
 				});
 
 				// instance.appendToLog(JSON.stringify(result.result));
-				instance.appendToLog('LP Objective Value:  ' + result.lp.objective);
+				instance.appendToLog('[glpk.js] LP Objective Value:  ' + result.lp.objective);
 				var objective = {
 					LP: result.lp
 				};
 				if (!!result.mip) {
-					instance.appendToLog('MIP Objective Value: ' + result.mip.objective);
+					instance.appendToLog('[glpk.js] MIP Objective Value: ' + result.mip.objective);
 					objective.MIP = result.mip;
 				}
 				instance.objective.set(objective);
@@ -149,6 +158,8 @@ if (Meteor.isClient) {
 					);
 					instance.jobBundle = jobBundleLP;
 					instance.hasJobBundle.set(true);
+
+					scrollTo.call(instance, '.log');
 				};
 			},
 			'click button#go-mpl': function() {
@@ -172,6 +183,8 @@ if (Meteor.isClient) {
 					);
 					instance.jobBundle = jobBundleMPL;
 					instance.hasJobBundle.set(true);
+
+					scrollTo.call(instance, '.log');
 				};
 			}
 		});
@@ -240,7 +253,7 @@ if (Meteor.isClient) {
 		var instance = this;
 		instance.selectRandomProblem = function selectRandomProblem() {
 			instance.clear('Ready...\n');
-			instance.$("#source").val(lpSampleProblems[Math.floor(lpSampleProblems.length * Math.random())]);
+			instance.$("#source").val(lpSampleProblems[Math.floor(lpSampleProblems.length * Math.random())] + '\n');
 		};
 	});
 
@@ -254,8 +267,8 @@ if (Meteor.isClient) {
 		instance.selectRandomProblem = function selectRandomProblem() {
 			instance.clear('Ready...\n');
 			var problem = mplSampleProblems[Math.floor(mplSampleProblems.length * Math.random())];
-			instance.$("#source-model").val(problem.model);
-			instance.$("#source-data").val(problem.data);
+			instance.$("#source-model").val(problem.model + '\n');
+			instance.$("#source-data").val(problem.data + '\n');
 		};
 	});
 
