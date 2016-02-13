@@ -55,17 +55,24 @@ function primalSolutionValueMIP(_solution) {
 	}
 }
 
-PackageUtilities.addImmutablePropertyFunction(GLPK, "createWorker", function createWorker(loggingCB, postsolveLoggingCB, completionCB, errorCB) {
+PackageUtilities.addImmutablePropertyFunction(GLPK, "createWorker", function createWorker(loggingCB, postsolveLoggingCB, completionCB, errorCB, intOptCB) {
 	var _solution;
 	var worker = new Worker("/packages/convexset_glpk/solve.js");
 	var started = false;
 	worker.onmessage = function(e) {
-		var obj = e.data;
+		var obj = JSON.parse(e.data);
 		switch (obj.action) {
 			case 'log':
 				if (_.isFunction(loggingCB)) {
 					setTimeout(function() {
 						loggingCB(obj.message);
+					}, 0);
+				}
+				break;
+			case 'log-intopt':
+				if (_.isFunction(intOptCB)) {
+					setTimeout(function() {
+						intOptCB(obj.message);
 					}, 0);
 				}
 				break;
@@ -86,11 +93,13 @@ PackageUtilities.addImmutablePropertyFunction(GLPK, "createWorker", function cre
 				break;
 			case 'done':
 				worker.terminate();
-				_solution = PackageUtilities.deepCopy(obj);
-				delete _solution.action;
+				_solution = {
+					lp: obj.sol_lp,
+					mip: obj.sol_mip,
+				}
 				if (_.isFunction(completionCB)) {
 					setTimeout(function() {
-						completionCB(obj);
+						completionCB(PackageUtilities.deepCopy(_solution));
 					}, 0);
 				}
 				break;
@@ -104,21 +113,22 @@ PackageUtilities.addImmutablePropertyFunction(GLPK, "createWorker", function cre
 		primalSolutionValueMIP: () => primalSolutionValueMIP(_solution),
 		solution: () => PackageUtilities.deepCopy(_solution),
 		isStarted: () => started,
-		solveLP: function solveLP(problem, solveMIP = true) {
+		solveLP: function solveLP(problem, solveMIP = true, mipParams = {}) {
 			if (!started) {
 				started = true;
 				setTimeout(function() {
 					worker.postMessage({
 						action: 'start',
 						problem: problem,
-						mip: solveMIP
+						mip: solveMIP,
+						mipParams: mipParams
 					});
 				}, 0);
 			} else {
 				throw new Meteor.Error('already-started');
 			}
 		},
-		solveMPL: function solveMPL(model, data = "", solveMIP = true) {
+		solveMPL: function solveMPL(model, data = "", solveMIP = true, mipParams = {}) {
 			if (!started) {
 				started = true;
 				setTimeout(function() {
@@ -126,7 +136,8 @@ PackageUtilities.addImmutablePropertyFunction(GLPK, "createWorker", function cre
 						action: 'start',
 						model: model,
 						data: data,
-						mip: solveMIP
+						mip: solveMIP,
+						mipParams: mipParams
 					});
 				}, 0);
 			} else {

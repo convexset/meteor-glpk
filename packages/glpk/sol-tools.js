@@ -1,10 +1,10 @@
 (function(exports) {
 	function makeLogger(webWorkerScope) {
 		return function log(value) {
-			webWorkerScope.postMessage({
+			webWorkerScope.postMessage(JSON.stringify({
 				action: 'log',
 				message: value
-			});
+			}));
 		};
 	}
 

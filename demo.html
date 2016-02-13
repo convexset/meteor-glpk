@@ -3,6 +3,16 @@
 </head>
 
 <body>
+	<h1>Meteor-GLPK Demo</h1>
+	<p>
+		This is a demo for <a href="https://atmospherejs.com/convexset/glpk/" target=_blank>Meteor-GLPK</a> which is <a href="https://github.com/hgourvest/glpk.js" target=_blank>GLPK.js</a> wrapped for Meteor. Problems may be provided in CPLEX LP format or GMPL format.
+	</p>
+
+	<p>
+		For more information, see the <a href="http://kam.mff.cuni.cz/~elias/glpk.pdf" target=_blank>GLPK Documentation</a> or the <a href="https://www3.nd.edu/~jeff/mathprog/glpk-4.47/doc/gmpl.pdf" target=_blank>GMPL Documentation</a>. To learn a little about the theory, have a look at <a href="http://lipas.uwasa.fi/~tsottine/lecture_notes/or.pdf" target=_blank>this</a>.
+	</p>
+
+	<hr>
 	{{> DemoLP}}
 	<hr>
 	{{> DemoMPL}}
@@ -14,7 +24,9 @@
 	<textarea class="ui textarea" id="source" style="width: 100%; font-family: Courier New;" rows="20"></textarea>
 	
 	<div>
-		<input class="ui checkbox mip" type="checkbox"> MIP
+		<input class="ui checkbox mip" type="checkbox" checked>&nbsp;MIP
+		&nbsp;&nbsp;&nbsp;
+		<input class="ui checkbox presolve" type="checkbox" checked>&nbsp;Pre-solve
 	</div>
 	
 	<div>
@@ -42,7 +54,9 @@
 	<textarea class="ui textarea" id="source-data" style="width: 100%; font-family: Courier New;" rows="20"></textarea>
 	
 	<div>
-		<input class="ui checkbox mip" type="checkbox" checked> MIP
+		<input class="ui checkbox mip" type="checkbox" checked>&nbsp;MIP
+		&nbsp;&nbsp;&nbsp;
+		<input class="ui checkbox presolve" type="checkbox" checked>&nbsp;Pre-solve
 	</div>
 	
 	<div>

@@ -1,8 +1,8 @@
 # GLPK
 
-[GLPK.js](https://github.com/hgourvest/glpk.js) wrapped for Meteor.
+[GLPK.js](https://github.com/hgourvest/glpk.js) wrapped for Meteor. Problems may be provided in CPLEX LP format or GMPL format.
 
-More information: [GLPK Documentation](http://kam.mff.cuni.cz/~elias/glpk.pdf) [GMPL Documentation](https://www3.nd.edu/~jeff/mathprog/glpk-4.47/doc/gmpl.pdf)
+For more information, see the [GLPK Documentation](http://kam.mff.cuni.cz/~elias/glpk.pdf) or the [GMPL Documentation](https://www3.nd.edu/~jeff/mathprog/glpk-4.47/doc/gmpl.pdf). To learn a little about the theory, have a look at [this](http://lipas.uwasa.fi/~tsottine/lecture_notes/or.pdf).
 
 ## Table of Contents
 
@@ -14,7 +14,7 @@ More information: [GLPK Documentation](http://kam.mff.cuni.cz/~elias/glpk.pdf) [
 - [Usage](#usage)
   - [CPLEX LP Format](#cplex-lp-format)
   - [GMPL Format](#gmpl-format)
-  - [Info](#info)
+  - [More Information](#more-information)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -25,6 +25,125 @@ This is available as [`convexset:glpk`](https://atmospherejs.com/convexset/glpk)
 ## Usage
 
 The general process is to create a web worker, start a solution pass and wait for the result. See the included example Meteor app for a more detailed example or [play with a deployed version](https://glpk.meteor.com).
+
+`GLPK.createWorker(loggingCB, postsolveLoggingCB, completionCB, errorCB, intOptCB)`
+ - `loggingCB`: logs messages such as
+   ```
+   Reading model section from null ...
+   57 lines were read
+   
+   Reading data section from null ...
+   21 lines were read
+   
+   Generating phi...
+   Generating psi...
+   Generating obj...
+   Model has been successfully generated
+   
+   Scaling...
+    A: min|aij| = 1  max|aij| = 54  ratio = 54
+   GM: min|aij| = 0.5024965815329516  max|aij| = 1.9900632894841375  ratio =    3.9603518961524267
+   EQ: min|aij| = 0.2660380370764144  max|aij| = 1.0000000000000002  ratio =    3.7588609921699625
+   
+   GLPK Simplex Optimizer, v4.49
+   17 rows, 64 columns, 192 non-zeros
+   Preprocessing...
+   16 rows, 64 columns, 128 non-zeros
+   Scaling...
+    A: min|aij| = 1  max|aij| = 1  ratio = 1
+   Problem data seem to be well scaled
+   Constructing initial basis...
+   Size of triangular part = 16
+    0: obj = 224  infeas = 7 (0)
+   *13: obj = 175  infeas = 0 (0)
+   *26: obj = 76  infeas = 0 (0)
+   OPTIMAL SOLUTION FOUND
+   
+   
+   GLPK Integer Optimizer, v4.49
+   17 rows, 64 columns, 192 non-zeros
+   0 integer variables, none of which are binary
+   Preprocessing...
+   16 rows, 64 columns, 128 non-zeros
+   0 integer variables, none of which are binary
+   Scaling...
+    A: min|aij| = 1  max|aij| = 1  ratio = 1
+   Problem data seem to be well scaled
+   Constructing initial basis...
+   Size of triangular part = 16
+   Solving LP relaxation...
+   GLPK Simplex Optimizer, v4.49
+   16 rows, 64 columns, 128 non-zeros
+    26: obj = 224  infeas = 7 (0)
+   *45: obj = 175  infeas = 0 (0)
+   *72: obj = 76  infeas = 0 (0)
+   OPTIMAL SOLUTION FOUND
+   Integer optimization begins...
+   +72: mip = not found yet >= -inf  (1; 0)
+   +72: >>>>> 76 >= 76   0.0% (1; 0)
+   +72: mip = 76 >= tree is empty   0.0% (0; 1)
+   INTEGER OPTIMAL SOLUTION FOUND
+   
+   Agent  Task       Cost
+       1     1         13
+       2     8          8
+       3     7         13
+       4     5         12
+       5     2          6
+       6     6         16
+       7     4          3
+       8     3          5
+   ----------------------
+        Total:         76
+   
+   Model has been successfully processed
+   ```
+ - `postsolveLoggingCB`: reports messages arising from the postsolve step (if applicable), for example...
+   ```
+   Agent  Task       Cost
+       1     1         13
+       2     8          8
+       3     7         13
+       4     5         12
+       5     2          6
+       6     6         16
+       7     4          3
+       8     3          5
+   ----------------------
+        Total:         76
+   
+   Model has been successfully processed
+   ```
+ - `completionCB`: called when the solve is complete. See [Info](#info) for an example of the payload, which is identical to what is returned by the `jobBundle.solution()` call
+ - `errorCB`: called on error, called with the error message as argument
+ - `intOptCB`: called on each integer optimization action, here is an example payload...
+   ```javascript
+   {
+       "reason": 2,
+       "reasonDescription": "better integer solution found",
+       "gap": 0.007662835249042145,
+       "mipObjective": 261,
+       "numCallbacks": 877,
+       "iterationCount": 542,
+       "treeInfo": {
+           "numActiveNodes": 131,
+           "numNodes": 272,
+           "totalNodesIncludingRemoved": 283
+       }
+   }
+   ```
+
+   where the reason codes can be read via `GLPK.getCodeDescription("reason codes", val).description`, though that is not necessary at this stage. For a listing, here is an excerpt from the description of constants:
+
+   ```javascript
+   "GLP_IROWGEN": {value: 0x01, description: "request for row generation"},
+   "GLP_IBINGO": {value: 0x02, description: "better integer solution found"},
+   "GLP_IHEUR": {value: 0x03, description: "request for heuristic solution"},
+   "GLP_ICUTGEN": {value: 0x04, description: "request for cut generation"},
+   "GLP_IBRANCH": {value: 0x05, description: "request for branching"},
+   "GLP_ISELECT": {value: 0x06, description: "request for subproblem selection"},
+   "GLP_IPREPRO": {value: 0x07, description: "request for preprocessing"},
+   ```
 
 ### CPLEX LP Format
 
@@ -42,6 +161,13 @@ var jobBundleLP = GLPK.createWorker(
     // completion callback
     function(info) {
         console.info('Error.', info);
+    },
+    // integer optimization callback
+    function(info) {
+        if (info.reason === GLPK.CONSTANTS.GLP_IBINGO) {
+            // filter for messages of interest
+            console.info('Int Opt Callback.', info);
+        }
     },
 );
 jobBundleLP.solveLP(lpProblemSourceCode, isMIP);
@@ -64,11 +190,18 @@ var jobBundleMPL = GLPK.createWorker(
     function(info) {
         console.info('Error.', info);
     },
+    // integer optimization callback
+    function(info) {
+        if (info.reason === GLPK.CONSTANTS.GLP_IBINGO) {
+            // filter for messages of interest
+            console.info('Int Opt Callback.', info);
+        }
+    },
 );
 jobBundleMPL.solveMPL(mplModelSourceCode, mplDataSourceCode, isMIP);
 ```
 
-### Info
+### More Information
 
 Descriptions of constants can be obtained from their codes via `GLPK.getCodeDescription(category, code)`. Available categories:
  - `"optimization direction flag"`
@@ -93,8 +226,12 @@ Descriptions of constants can be obtained from their codes via `GLPK.getCodeDesc
  - `"basis factorization control parameter"`
 
 After creating a worker with `GLPK.createWorker`, the object returned implements the following:
- - `jobBundleLP.solveLP(lpProblemSourceCode, isMIP)`: starts a solve using model and data files in CPLEX LP format
- - `jobBundleMPL.solveMPL(mplModelSourceCode, mplDataSourceCode, isMIP)`: starts a solve using model and data files in MPL format
+ - `jobBundleLP.solveLP(lpProblemSourceCode, isMIP, mipParams)`: starts a solve using model and data files in CPLEX LP format
+   * `isMIP`: whether to also solve as MIP once LP relaxation solved (default: `true`)
+   * `mipParams`: provides updates to default values of integer optimization control parameters (defaults: `{}`)
+ - `jobBundleMPL.solveMPL(mplModelSourceCode, mplDataSourceCode, isMIP, mipParams)`: starts a solve using model and data files in MPL format
+   * `isMIP`: whether to also solve as MIP once LP relaxation solved (default: `true`)
+   * `mipParams`: provides updates to default values of integer optimization control parameters (defaults: `{}`)
  - `jobBundle.isStarted()`: reports whether the solution process has started
  - `jobBundle.primalSolutionValueLP()`: returns the primal solution value of the LP solution
  - `jobBundle.dualSolutionValueLP()`: returns the dual solution value of the LP solution
@@ -103,7 +240,7 @@ After creating a worker with `GLPK.createWorker`, the object returned implements
 
 ```javascript
 {
-    "sol_lp": {
+    "lp": {
         "cols": {
             "x": {
                 "idx": 1,
@@ -196,7 +333,7 @@ After creating a worker with `GLPK.createWorker`, the object returned implements
         "primal_stat": 2,  // Get description via: GLPK.getCodeDescription("solution status", val).description
         "return_code": 0   // Get description via: GLPK.getCodeDescription("return codes", val).description
     },
-    "sol_mip": {
+    "mip": {
         "cols": {
             "x": {
                 "idx": 1,
@@ -291,7 +428,7 @@ After creating a worker with `GLPK.createWorker`, the object returned implements
     }
 }
 ```
-for the following model
+for the following model in CPLEX LP format
 ```
 \* Objective function *\
 Maximize

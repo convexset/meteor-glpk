@@ -1,6 +1,6 @@
 Package.describe({
 	name: 'convexset:glpk',
-	version: '0.0.2',
+	version: '0.0.3',
 	summary: 'GLPK.js wrapped for Meteor',
 	git: 'https://github.com/convexset/meteor-glpk',
 	documentation: '../../README.md'
@@ -19,12 +19,22 @@ Package.onUse(function(api) {
 	api.use([], 'server');
 	api.use([], 'client');
 
+	// api.addAssets([
+	// 	'extras/glpk.js',
+	// 	'extras/glpk.min.js',
+	// ], ["client", "server"]);
+
 	api.addAssets([
 		'glpk.min.js',
+	], ["client", "server"]);
+
+	api.addAssets([
+		'array.includes.js',
 		'solve.js',
 		'sol-tools.js',
 	], ["client", "server"]);
 
+	api.addFiles('array.includes.js');
 	api.addFiles('constants.js');
 	api.addFiles('front-end.js');
 

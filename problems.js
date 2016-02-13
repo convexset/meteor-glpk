@@ -46,6 +46,8 @@ lpSampleProblems = [
         Bounds
         -1 <= x <= 1
         -1 <= y <= 1
+
+        End
     `,
     `
         \\* Objective function *\\
@@ -65,6 +67,8 @@ lpSampleProblems = [
 
         Integer
         a
+
+        End
     `,
     `
         \\* Objective function *\\
@@ -183,7 +187,7 @@ lpSampleProblems = [
 
         End
     `,
-`
+    `
         \\* Problem: todd *\\
 
         Maximize
@@ -231,6 +235,38 @@ lpSampleProblems = [
         x13
         x14
         x15
+
+        End
+    `,
+    `
+        \* Objective function *\
+        Minimize
+        obj: + x_12 + x_14
+             + x_21 + x_23 + 1.05 x_24
+             + x_32 + x_34
+             + x_41 + 1.05 x_42 + x_43
+
+        Subject To
+        balance_node_1: + x_12 + x_14 - x_21 - x_41               = 7.25
+        balance_node_2: + x_21 + x_23 + x_24 - x_12 - x_32 - x_42 = 3.75
+        balance_node_3: + x_32 + x_34 - x_23 - x_43               = -6.4
+        balance_node_4: + x_41 + x_42 + x_43 - x_14 - x_24 - x_34 = -4.6
+
+        Bounds
+        0 <= x_12 <= 4
+        0 <= x_14 <= 4
+        0 <= x_21 <= 3.5
+        0 <= x_23 <= 3.5
+        0 <= x_24
+        0 <= x_32 <= 3.5
+        0 <= x_34 <= 3.5
+        0 <= x_41 <= 3.5
+        0 <= x_42
+        0 <= x_43 <= 3.5
+
+        Integer
+        x_24
+        x_42
 
         End
     `
@@ -1236,18 +1272,560 @@ mplSampleProblems = [
             end;
         `
     },
+    {
+        model: `
+            /* CRYPTO, a crypto-arithmetic puzzle */
+
+            /* Written in GNU MathProg by Andrew Makhorin <mao@gnu.org> */
+
+            /* This problem comes from the newsgroup rec.puzzle.
+               The numbers from 1 to 26 are assigned to the letters of the alphabet.
+               The numbers beside each word are the total of the values assigned to
+               the letters in the word (e.g. for LYRE: L, Y, R, E might be to equal
+               5, 9, 20 and 13, or any other combination that add up to 47).
+               Find the value of each letter under the equations:
+
+               BALLET  45     GLEE  66     POLKA      59     SONG     61
+               CELLO   43     JAZZ  58     QUARTET    50     SOPRANO  82
+               CONCERT 74     LYRE  47     SAXOPHONE 134     THEME    72
+               FLUTE   30     OBOE  53     SCALE      51     VIOLIN  100
+               FUGUE   50     OPERA 65     SOLO       37     WALTZ    34
+
+               Solution:
+               A, B,C, D, E,F, G, H, I, J, K,L,M, N, O, P,Q, R, S,T,U, V,W, X, Y, Z
+               5,13,9,16,20,4,24,21,25,17,23,2,8,12,10,19,7,11,15,3,1,26,6,22,14,18
+
+               Reference:
+               Koalog Constraint Solver <http://www.koalog.com/php/jcs.php>,
+               Simple problems, the crypto-arithmetic puzzle ALPHACIPHER. */
+
+            set LETTERS :=
+            {     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+            };
+            /* set of letters */
+
+            set VALUES := 1..card(LETTERS);
+            /* set of values assigned to the letters */
+
+            set WORDS;
+            /* set of words */
+
+            param total{word in WORDS};
+            /* total[word] is the total of the values assigned to the letters in
+               the word */
+
+            var x{i in LETTERS, j in VALUES}, binary;
+            /* x[i,j] = 1 means that letter i is assigned value j */
+
+            s.t. phi{i in LETTERS}: sum{j in VALUES} x[i,j] = 1;
+
+            s.t. psi{j in VALUES}: sum{i in LETTERS} x[i,j] = 1;
+
+            s.t. eqn{word in WORDS}: sum{k in 1..length(word), j in VALUES}
+                  j * x[substr(word,k,1), j] = total[word];
+
+            solve;
+
+            printf{i in LETTERS} "  %s", i;
+            printf "\\n";
+
+            printf{i in LETTERS} " %2d", sum{j in VALUES} j * x[i,j];
+            printf "\\n";
+
+            end;
+        `,
+        data: `
+            data;
+
+            param :  WORDS :   total :=
+                     BALLET       45
+                     CELLO        43
+                     CONCERT      74
+                     FLUTE        30
+                     FUGUE        50
+                     GLEE         66
+                     JAZZ         58
+                     LYRE         47
+                     OBOE         53
+                     OPERA        65
+                     POLKA        59
+                     QUARTET      50
+                     SAXOPHONE   134
+                     SCALE        51
+                     SOLO         37
+                     SONG         61
+                     SOPRANO      82
+                     THEME        72
+                     VIOLIN      100
+                     WALTZ        34 ;
+
+            end;
+        `
+    },
+    {
+        model: `
+            /* ASSIGN, Assignment Problem */
+
+            /* Written in GNU MathProg by Andrew Makhorin <mao@gnu.org> */
+
+            /* The assignment problem is one of the fundamental combinatorial
+               optimization problems.
+
+               In its most general form, the problem is as follows:
+
+               There are a number of agents and a number of tasks. Any agent can be
+               assigned to perform any task, incurring some cost that may vary
+               depending on the agent-task assignment. It is required to perform all
+               tasks by assigning exactly one agent to each task in such a way that
+               the total cost of the assignment is minimized.
+
+               (From Wikipedia, the free encyclopedia.) */
+
+            param m, integer, > 0;
+            /* number of agents */
+
+            param n, integer, > 0;
+            /* number of tasks */
+
+            set I := 1..m;
+            /* set of agents */
+
+            set J := 1..n;
+            /* set of tasks */
+
+            param c{i in I, j in J}, >= 0;
+            /* cost of allocating task j to agent i */
+
+            var x{i in I, j in J}, >= 0;
+            /* x[i,j] = 1 means task j is assigned to agent i
+               note that variables x[i,j] are binary, however, there is no need to
+               declare them so due to the totally unimodular constraint matrix */
+
+            s.t. phi{i in I}: sum{j in J} x[i,j] <= 1;
+            /* each agent can perform at most one task */
+
+            s.t. psi{j in J}: sum{i in I} x[i,j] = 1;
+            /* each task must be assigned exactly to one agent */
+
+            minimize obj: sum{i in I, j in J} c[i,j] * x[i,j];
+            /* the objective is to find a cheapest assignment */
+
+            solve;
+
+            printf "\\n";
+            printf "Agent  Task       Cost\\n";
+            printf{i in I} "%5d %5d %10g\\n", i, sum{j in J} j * x[i,j],
+               sum{j in J} c[i,j] * x[i,j];
+            printf "----------------------\\n";
+            printf "     Total: %10g\\n", sum{i in I, j in J} c[i,j] * x[i,j];
+            printf "\\n";
+
+            end;
+        `,
+        data: `
+            data;
+
+            /* These data correspond to an example from [Christofides]. */
+
+            /* Optimal solution is 76 */
+
+            param m := 8;
+
+            param n := 8;
+
+            param c : 1  2  3  4  5  6  7  8 :=
+                  1  13 21 20 12  8 26 22 11
+                  2  12 36 25 41 40 11  4  8
+                  3  35 32 13 36 26 21 13 37
+                  4  34 54  7  8 12 22 11 40
+                  5  21  6 45 18 24 34 12 48
+                  6  42 19 39 15 14 16 28 46
+                  7  16 34 38  3 34 40 22 24
+                  8  26 20  5 17 45 31 37 43 ;
+
+            end;
+        `
+    },
+    {
+        model: `
+            /* FCTP, Fixed-Charge Transportation Problem */
+            
+            /* Written in GNU MathProg by Andrew Makhorin <mao@gnu.org> */
+            
+            /* The Fixed-Charge Transportation Problem (FCTP) is obtained from
+               classical transportation problem by imposing a fixed cost on each
+               transportation link if there is a positive flow on that link. */
+            
+            param m, integer, > 0;
+            /* number of sources */
+            
+            param n, integer, > 0;
+            /* number of customers */
+            
+            set I := 1..m;
+            /* set of sources */
+            
+            set J := 1..n;
+            /* set of customers */
+            
+            param supply{i in I}, >= 0;
+            /* supply at source i */
+            
+            param demand{j in J}, >= 0;
+            /* demand at customer j */
+            
+            param varcost{i in I, j in J}, >= 0;
+            /* variable cost (a cost per one unit shipped from i to j) */
+            
+            param fixcost{i in I, j in J}, >= 0;
+            /* fixed cost (a cost for shipping any amount from i to j) */
+            
+            var x{i in I, j in J}, >= 0;
+            /* amount shipped from source i to customer j */
+            
+            s.t. f{i in I}: sum{j in J} x[i,j] = supply[i];
+            /* observe supply at source i */
+            
+            s.t. g{j in J}: sum{i in I} x[i,j] = demand[j];
+            /* satisfy demand at customer j */
+            
+            var y{i in I, j in J}, binary;
+            /* y[i,j] = 1 means some amount is shipped from i to j */
+            
+            s.t. h{i in I, j in J}: x[i,j] <= min(supply[i], demand[j]) * y[i,j];
+            /* if y[i,j] is 0, force x[i,j] to be 0 (may note that supply[i] and
+               demand[j] are implicit upper bounds for x[i,j] as follows from the
+               constraints f[i] and g[j]) */
+            
+            minimize cost: sum{i in I, j in J} varcost[i,j] * x[i,j] +
+                           sum{i in I, j in J} fixcost[i,j] * y[i,j];
+            /* total transportation costs */
+            
+            end;
+        `,
+        data: `
+            data;
+            
+            /* These data correspond to the instance bal8x12 from [Balinski]. */
+            
+            /* The optimal solution is 471.55 */
+            
+            param m := 8;
+            
+            param n := 12;
+            
+            param supply := 1 15.00,  2 20.00,  3 45.00,  4 35.00,
+                            5 25.00,  6 35.00,  7 10.00,  8 25.00;
+            
+            param demand := 1 20.00,  2 15.00,  3 20.00,  4 15.00,
+                            5  5.00,  6 20.00,  7 30.00,  8 10.00,
+                            9 35.00, 10 25.00, 11 10.00, 12  5.00;
+            
+            param varcost
+                  :   1    2    3    4    5    6    7    8    9    10   11   12  :=
+                  1  0.69 0.64 0.71 0.79 1.70 2.83 2.02 5.64 5.94 5.94 5.94 7.68
+                  2  1.01 0.75 0.88 0.59 1.50 2.63 2.26 5.64 5.85 5.62 5.85 4.94
+                  3  1.05 1.06 1.08 0.64 1.22 2.37 1.66 5.64 5.91 5.62 5.91 4.94
+                  4  1.94 1.50 1.56 1.22 1.98 1.98 1.36 6.99 6.99 6.99 6.99 3.68
+                  5  1.61 1.40 1.61 1.33 1.68 2.83 1.54 4.26 4.26 4.26 4.26 2.99
+                  6  5.29 5.94 6.08 5.29 5.96 6.77 5.08 0.31 0.21 0.17 0.31 1.53
+                  7  5.29 5.94 6.08 5.29 5.96 6.77 5.08 0.55 0.35 0.40 0.19 1.53
+                  8  5.29 6.08 6.08 5.29 5.96 6.45 5.08 2.43 2.30 2.33 1.81 2.50 ;
+            
+            param fixcost
+                  :   1    2    3    4    5    6    7    8    9    10   11   12  :=
+                  1  11.0 16.0 18.0 17.0 10.0 20.0 17.0 13.0 15.0 12.0 14.0 14.0
+                  2  14.0 17.0 17.0 13.0 15.0 13.0 16.0 11.0 20.0 11.0 15.0 10.0
+                  3  12.0 13.0 20.0 17.0 13.0 15.0 16.0 13.0 12.0 13.0 10.0 18.0
+                  4  16.0 19.0 16.0 11.0 15.0 12.0 18.0 12.0 18.0 13.0 13.0 14.0
+                  5  19.0 18.0 15.0 16.0 12.0 14.0 20.0 19.0 11.0 17.0 16.0 18.0
+                  6  13.0 20.0 20.0 17.0 15.0 12.0 14.0 11.0 12.0 19.0 15.0 16.0
+                  7  11.0 12.0 15.0 10.0 17.0 11.0 11.0 16.0 10.0 18.0 17.0 12.0
+                  8  17.0 10.0 20.0 12.0 17.0 20.0 16.0 15.0 10.0 12.0 16.0 18.0 ;
+            
+            end;
+        `
+    },
+    {
+        model: `
+            /* MAXCUT, Maximum Cut Problem */
+
+            /* Written in GNU MathProg by Andrew Makhorin <mao@gnu.org> */
+
+            /* The Maximum Cut Problem in a network G = (V, E), where V is a set
+               of nodes, E is a set of edges, is to find the partition of V into
+               disjoint sets V1 and V2, which maximizes the sum of edge weights
+               w(e), where edge e has one endpoint in V1 and other endpoint in V2.
+
+               Reference:
+               Garey, M.R., and Johnson, D.S. (1979), Computers and Intractability:
+               A guide to the theory of NP-completeness [Network design, Cuts and
+               Connectivity, Maximum Cut, ND16]. */
+
+            set E, dimen 2;
+            /* set of edges */
+
+            param w{(i,j) in E}, >= 0, default 1;
+            /* w[i,j] is weight of edge (i,j) */
+
+            set V := (setof{(i,j) in E} i) union (setof{(i,j) in E} j);
+            /* set of nodes */
+
+            var x{i in V}, binary;
+            /* x[i] = 0 means that node i is in set V1
+               x[i] = 1 means that node i is in set V2 */
+
+            /* We need to include in the objective function only that edges (i,j)
+               from E, for which x[i] != x[j]. This can be modeled through binary
+               variables s[i,j] as follows:
+
+                  s[i,j] = x[i] xor x[j] = (x[i] + x[j]) mod 2,                  (1)
+
+               where s[i,j] = 1 iff x[i] != x[j], that leads to the following
+               objective function:
+
+                  z = sum{(i,j) in E} w[i,j] * s[i,j].                           (2)
+
+               To describe "exclusive or" (1) we could think that s[i,j] is a minor
+               bit of the sum x[i] + x[j]. Then introducing binary variables t[i,j],
+               which represent a major bit of the sum x[i] + x[j], we can write:
+
+                  x[i] + x[j] = s[i,j] + 2 * t[i,j].                             (3)
+
+               An easy check shows that conditions (1) and (3) are equivalent.
+
+               Note that condition (3) can be simplified by eliminating variables
+               s[i,j]. Indeed, from (3) it follows that:
+
+                  s[i,j] = x[i] + x[j] - 2 * t[i,j].                             (4)
+
+               Since the expression in the right-hand side of (4) is integral, this
+               condition can be rewritten in the equivalent form:
+
+                  0 <= x[i] + x[j] - 2 * t[i,j] <= 1.                            (5)
+
+               (One might note that (5) means t[i,j] = x[i] and x[j].)
+
+               Substituting s[i,j] from (4) to (2) leads to the following objective
+               function:
+
+                  z = sum{(i,j) in E} w[i,j] * (x[i] + x[j] - 2 * t[i,j]),       (6)
+
+               which does not include variables s[i,j]. */
+
+            var t{(i,j) in E}, binary;
+            /* t[i,j] = x[i] and x[j] = (x[i] + x[j]) div 2 */
+
+            s.t. xor{(i,j) in E}: 0 <= x[i] + x[j] - 2 * t[i,j] <= 1;
+            /* see (4) */
+
+            maximize z: sum{(i,j) in E} w[i,j] * (x[i] + x[j] - 2 * t[i,j]);
+            /* see (6) */
+
+            end;
+        `,
+        data: `
+            data;
+
+            /* In this example the network has 15 nodes and 22 edges. */
+
+            /* Optimal solution is 20 */
+
+            set E :=
+               1 2, 1 5, 2 3, 2 6, 3 4, 3 8, 4 9, 5 6, 5 7, 6 8, 7 8, 7 12, 8 9,
+               8 12, 9 10, 9 14, 10 11, 10 14, 11 15, 12 13, 13 14, 14 15;
+
+            end;
+        `
+    },
+    {
+        model: `
+            /* MAXFLOW, Maximum Flow Problem */
+
+            /* Written in GNU MathProg by Andrew Makhorin <mao@gnu.org> */
+
+            /* The Maximum Flow Problem in a network G = (V, E), where V is a set
+               of nodes, E within V x V is a set of arcs, is to maximize the flow
+               from one given node s (source) to another given node t (sink) subject
+               to conservation of flow constraints at each node and flow capacities
+               on each arc. */
+
+            param n, integer, >= 2;
+            /* number of nodes */
+
+            set V, default {1..n};
+            /* set of nodes */
+
+            set E, within V cross V;
+            /* set of arcs */
+
+            param a{(i,j) in E}, > 0;
+            /* a[i,j] is capacity of arc (i,j) */
+
+            param s, symbolic, in V, default 1;
+            /* source node */
+
+            param t, symbolic, in V, != s, default n;
+            /* sink node */
+
+            var x{(i,j) in E}, >= 0, <= a[i,j];
+            /* x[i,j] is elementary flow through arc (i,j) to be found */
+
+            var flow, >= 0;
+            /* total flow from s to t */
+
+            s.t. node{i in V}:
+            /* node[i] is conservation constraint for node i */
+
+               sum{(j,i) in E} x[j,i] + (if i = s then flow)
+               /* summary flow into node i through all ingoing arcs */
+
+               = /* must be equal to */
+
+               sum{(i,j) in E} x[i,j] + (if i = t then flow);
+               /* summary flow from node i through all outgoing arcs */
+
+            maximize obj: flow;
+            /* objective is to maximize the total flow through the network */
+
+            solve;
+
+            printf{1..56} "="; printf "\\n";
+            printf "Maximum flow from node %s to node %s is %g\\n\\n", s, t, flow;
+            printf "Starting node   Ending node   Arc capacity   Flow in arc\\n";
+            printf "-------------   -----------   ------------   -----------\\n";
+            printf{(i,j) in E: x[i,j] != 0}: "%13s   %11s   %12g   %11g\\n", i, j,
+               a[i,j], x[i,j];
+            printf{1..56} "="; printf "\\n";
+
+            end;
+        `,
+        data: `
+            data;
+
+            /* These data correspond to an example from [Christofides]. */
+
+            /* Optimal solution is 29 */
+
+            param n := 9;
+
+            param : E :   a :=
+                   1 2   14
+                   1 4   23
+                   2 3   10
+                   2 4    9
+                   3 5   12
+                   3 8   18
+                   4 5   26
+                   5 2   11
+                   5 6   25
+                   5 7    4
+                   6 7    7
+                   6 8    8
+                   7 9   15
+                   8 9   20;
+
+            end;
+        `
+    },
+    {
+        model: `
+            /* SUDOKU, Number Placement Puzzle */
+
+            /* Written in GNU MathProg by Andrew Makhorin <mao@gnu.org> */
+
+            /* Sudoku, also known as Number Place, is a logic-based placement
+               puzzle. The aim of the canonical puzzle is to enter a numerical
+               digit from 1 through 9 in each cell of a 9x9 grid made up of 3x3
+               subgrids (called "regions"), starting with various digits given in
+               some cells (the "givens"). Each row, column, and region must contain
+               only one instance of each numeral.
+
+                Example:
+
+                +-------+-------+-------+
+                | 5 3 . | . 7 . | . . . |
+                | 6 . . | 1 9 5 | . . . |
+                | . 9 8 | . . . | . 6 . |
+                +-------+-------+-------+
+                | 8 . . | . 6 . | . . 3 |
+                | 4 . . | 8 . 3 | . . 1 |
+                | 7 . . | . 2 . | . . 6 |
+                +-------+-------+-------+
+                | . 6 . | . . . | 2 8 . |
+                | . . . | 4 1 9 | . . 5 |
+                | . . . | . 8 . | . 7 9 |
+                +-------+-------+-------+
+
+                (From Wikipedia, the free encyclopedia.) */
+
+            param givens{1..9, 1..9}, integer, >= 0, <= 9, default 0;
+            /* the "givens" */
+
+            var x{i in 1..9, j in 1..9, k in 1..9}, binary;
+            /* x[i,j,k] = 1 means cell [i,j] is assigned number k */
+
+            s.t. fa{i in 1..9, j in 1..9, k in 1..9: givens[i,j] != 0}:
+                x[i,j,k] = (if givens[i,j] = k then 1 else 0);
+            /* assign pre-defined numbers using the "givens" */
+
+            s.t. fb{i in 1..9, j in 1..9}: sum{k in 1..9} x[i,j,k] = 1;
+            /* each cell must be assigned exactly one number */
+
+            s.t. fc{i in 1..9, k in 1..9}: sum{j in 1..9} x[i,j,k] = 1;
+            /* cells in the same row must be assigned distinct numbers */
+
+            s.t. fd{j in 1..9, k in 1..9}: sum{i in 1..9} x[i,j,k] = 1;
+            /* cells in the same column must be assigned distinct numbers */
+
+            s.t. fe{I in 1..9 by 3, J in 1..9 by 3, k in 1..9}:
+                sum{i in I..I+2, j in J..J+2} x[i,j,k] = 1;
+            /* cells in the same region must be assigned distinct numbers */
+
+            /* there is no need for an objective function here */
+
+            solve;
+
+            for {i in 1..9}
+            {  for {0..0: i = 1 or i = 4 or i = 7}
+                printf " +-------+-------+-------+\\n";
+                for {j in 1..9}
+                {  for {0..0: j = 1 or j = 4 or j = 7} printf(" |");
+                printf " %d", sum{k in 1..9} x[i,j,k] * k;
+                for {0..0: j = 9} printf(" |\\n");
+                }
+                for {0..0: i = 9}
+                printf " +-------+-------+-------+\\n";
+            }
+
+            end;
+        `,
+        data: `
+            /* sudoku.dat, a hard Sudoku puzzle which causes branching */
+            
+            data;
+            
+            param givens : 1 2 3 4 5 6 7 8 9 :=
+                       1   1 . . . . . 7 . .
+                       2   . 2 . . . . 5 . .
+                       3   6 . . 3 8 . . . .
+                       4   . 7 8 . . . . . .
+                       5   . . . 6 . 9 . . .
+                       6   . . . . . . 1 4 .
+                       7   . . . . 2 5 . . 9
+                       8   . . 3 . . . . 6 .
+                       9   . . 4 . . . . . 2 ;
+            
+            end;
+        `
+    },
     // {
     //     model: `
     //     `,
     //     data: `
     //     `
     // },
-    // {
-    //     model: `
-    //     `,
-    //     data: `
-    //     `
-    // }
 ].map(x => ({
     model: trimExcess(x.model),
     data: trimExcess(x.data),

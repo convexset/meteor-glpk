@@ -33,7 +33,7 @@ if (Meteor.isClient) {
 			};
 			instance.appendToLog = function appendToLog(msg) {
 				// console.log('[LOG]', msg);
-				return operateOnArrayInReactiveVar(log, 'push', msg + '\n');
+				return operateOnArrayInReactiveVar(log, 'push', (typeof msg === "string" ? msg : EJSON.stringify(msg)) + '\n');
 			};
 			instance.appendToCols = function appendToCols(name, value) {
 				// console.log('[SOLUTION] ' + name + ':', value);
@@ -53,10 +53,10 @@ if (Meteor.isClient) {
 			console.log('[COMPLETION]', instance.view.name, result);
 			if (!!result) {
 				[{
-					data: result.sol_lp,
+					data: result.lp,
 					isMIP: false
 				}, {
-					data: result.sol_mip,
+					data: result.mip,
 					isMIP: true
 				}].forEach(function(items) {
 					if (!!items.data) {
@@ -74,13 +74,13 @@ if (Meteor.isClient) {
 				});
 
 				// instance.appendToLog(JSON.stringify(result.result));
-				instance.appendToLog('LP Objective Value: ' + result.sol_lp.objective);
+				instance.appendToLog('LP Objective Value:  ' + result.lp.objective);
 				var objective = {
-					LP: result.sol_lp
+					LP: result.lp
 				};
-				if (!!result.sol_mip) {
-					instance.appendToLog('MIP Objective Value: ' + result.sol_mip.objective);
-					objective.MIP = result.sol_mip;
+				if (!!result.mip) {
+					instance.appendToLog('MIP Objective Value: ' + result.mip.objective);
+					objective.MIP = result.mip;
 				}
 				instance.objective.set(objective);
 			} else {
@@ -95,6 +95,24 @@ if (Meteor.isClient) {
 			console.log('[ERROR]', instance.view.name, info);
 			instance.jobBundle = null;
 			instance.hasJobBundle.set(false);
+		}
+
+		var INTOPT_EVENTS = [
+			GLPK.CONSTANTS.GLP_IBINGO,
+			// GLPK.CONSTANTS.GLP_IROWGEN,
+			// GLPK.CONSTANTS.GLP_ICUTGEN,
+			// GLPK.CONSTANTS.GLP_IBRANCH,
+			// GLPK.CONSTANTS.GLP_IHEUR,
+			// GLPK.CONSTANTS.GLP_ISELECT,
+			// GLPK.CONSTANTS.GLP_IPREPRO,
+		];
+
+		function intOptCB(instance, info) {
+			if (INTOPT_EVENTS.includes(info.reason)) {
+				var message = `[INTOPT|${instance.view.name}|${info.iterationCount}] ${info.reasonDescription}; Obj: ${info.mipObjective} (#cb: ${info.numCallbacks})`;
+				console.info(message);
+				instance.appendToLog(message);
+			}
 		}
 
 		tmpl.events({
@@ -120,8 +138,15 @@ if (Meteor.isClient) {
 						null,
 						_.bind(completionCB, instance, instance),
 						_.bind(errorCB, instance, instance),
+						_.bind(intOptCB, instance, instance),
 					);
-					jobBundleLP.solveLP(instance.$('#source').val(), instance.$('.mip')[0].checked);
+					jobBundleLP.solveLP(
+						instance.$('#source').val(),
+						instance.$('.mip')[0].checked, {
+							presolve: instance.$('.presolve')[0].checked ? GLPK.CONSTANTS.GLP_ON : GLPK.CONSTANTS.GLP_OFF,
+							tm_lim: 1000 * 60 * 5,
+						}
+					);
 					instance.jobBundle = jobBundleLP;
 					instance.hasJobBundle.set(true);
 				};
@@ -132,17 +157,18 @@ if (Meteor.isClient) {
 					instance.clear();
 					jobBundleMPL = GLPK.createWorker(
 						msg => instance.appendToLog(msg),
-						function (msg) {
-							instance.appendToLog(msg);
-							console.info(msg);
-						},
+						msg => console.info(msg),
 						_.bind(completionCB, instance, instance),
 						_.bind(errorCB, instance, instance),
+						_.bind(intOptCB, instance, instance),
 					);
 					jobBundleMPL.solveMPL(
 						instance.$('#source-model').val(),
 						instance.$('#source-data').val(),
-						instance.$('.mip')[0].checked
+						instance.$('.mip')[0].checked, {
+							presolve: instance.$('.presolve')[0].checked ? GLPK.CONSTANTS.GLP_ON : GLPK.CONSTANTS.GLP_OFF,
+							tm_lim: 1000 * 60 * 5,
+						}
 					);
 					instance.jobBundle = jobBundleMPL;
 					instance.hasJobBundle.set(true);

@@ -1,19 +1,34 @@
+// importScripts('extras/glpk.js');
 importScripts('glpk.min.js');
 importScripts('sol-tools.js');
+importScripts('array.includes.js');
+
 
 self.addEventListener('message', function(e) {
 
 	var lp, problem;
 
+	function sendToMain(payload) {
+		postMessage(JSON.stringify(payload));
+	}
+
 	function log(value) {
-		self.postMessage({
+		sendToMain({
 			action: 'log',
 			message: value
 		});
 	}
 
+	function mipCBLog(value) {
+		sendToMain({
+			action: 'log-intopt',
+			message: value
+		});
+	}
+
 	function postsolveLog(value) {
-		self.postMessage({
+		log(value);
+		sendToMain({
 			action: 'log-postsolve',
 			message: value
 		});
@@ -40,35 +55,6 @@ self.addEventListener('message', function(e) {
 
 				if ((typeof obj.model === "string") && (typeof obj.data === "string")) {
 					problem = glpkParseMPL.call(self, obj.model, obj.data);
-					// (function() {
-					// 	// log(obj)
-					// 	lp = glp_create_prob();
-					// 	var tran = glp_mpl_alloc_wksp();
-
-					// 	ret = glp_mpl_read_model_from_string(tran, null, obj.model);
-					// 	if (ret !== 0) {
-					// 		throw "error|glp_mpl_read_model_from_string|" + ret;
-					// 	}
-
-					// 	ret = glp_mpl_read_data_from_string(tran, null, obj.data);
-					// 	if (ret !== 0) {
-					// 		throw "error|glp_mpl_read_data_from_string|" + ret;
-					// 	}
-
-					// 	ret = glp_mpl_generate(tran, null);
-					// 	if (ret !== 0) {
-					// 		throw "error|glp_mpl_generate|" + ret;
-					// 	}
-
-					// 	log('[glpk.js] Building optimization problem...\n');
-					// 	glp_mpl_build_prob(tran, lp);
-
-					// 	problem = {
-					// 		type: 'MPL',
-					// 		lp: lp,
-					// 		tran: tran,
-					// 	}
-					// })();
 					num_problems_loaded += 1;
 				}
 				if (num_problems_loaded !== 1) {
@@ -102,10 +88,21 @@ self.addEventListener('message', function(e) {
 					glp_set_print_func(log);
 					log('\n[glpk.js] Postsolving complete.\n');
 				}
+				if (!!obj.mip && [GLP_OPT, GLP_FEAS].includes(sol_lp.status)) {
+					log('\n[glpk.js] Solving MIP...\n');
+					var iocp = new IOCP();
 
-				if (!!obj.mip) {
-					log('\n[glpk.js] Solving MIP solution...\n');
-					ret_mip = glp_intopt(lp);
+					iocp.cb_func = generate_iocpCallbackFunction(log, mipCBLog);
+
+					if (!!obj.mipParams) {
+						for (var key in obj.mipParams) {
+							if (iocp.hasOwnProperty(key) && obj.mipParams.hasOwnProperty(key)) {
+								iocp[key] = obj.mipParams[key];
+								log('[glpk.js] Setting iocp[' + key + '] to ' + obj.mipParams[key] + '...\n');
+							}
+						}
+					}
+					ret_mip = glp_intopt(lp, iocp);
 
 					log('\n[glpk.js] Getting MIP solution...\n');
 					sol_mip = glpkGetMIPSolution.call(self, lp);
@@ -130,11 +127,81 @@ self.addEventListener('message', function(e) {
 
 			} catch (err) {
 				result.action = 'error';
-				result.error = err;
+				result.error = err.message;
 			} finally {
 				lp = null;
-				self.postMessage(result);
+				sendToMain(result);
+				if (result.action === 'done') {
+					close();
+				}
 			}
 			break;
 	}
 }, false);
+
+//////////////////////////////////////////////////////////////////////
+// Integer Optimization Callback Function
+//////////////////////////////////////////////////////////////////////
+function generate_iocpCallbackFunction(logFn, mipCBLogFn) {
+	var num_cb = 0;
+	return function iocpCallbackFunction(tree, info) {
+		var reason = glp_ios_reason(tree);
+		var reason_description = "";
+		num_cb += 1;
+		switch (reason) {
+			case GLP_IROWGEN:
+				// request for row generation
+				reason_description = "request for row generation";
+				break;
+			case GLP_IBINGO:
+				// better integer solution found
+				reason_description = "better integer solution found";
+				break;
+			case GLP_IHEUR:
+				// request for heuristic solution
+				reason_description = "request for heuristic solution";
+				break;
+			case GLP_ICUTGEN:
+				// request for cut generation
+				reason_description = "request for cut generation";
+				break;
+			case GLP_IBRANCH:
+				// request for branching
+				reason_description = "request for branching";
+				break;
+			case GLP_ISELECT:
+				// request for subproblem selection
+				reason_description = "request for subproblem selection";
+				break;
+			case GLP_IPREPRO:
+				// request for preprocessing
+				reason_description = "request for preprocessing";
+				break;
+			default:
+				/* ignore call for other reasons */
+				break;
+		}
+
+		var gap = glp_ios_relative_gap(tree);
+		var lp = glp_ios_get_prob(tree);
+		var mip_obj = glp_mip_obj_val(lp);
+
+		mipCBLogFn({
+			reason: reason,
+			reasonDescription: reason_description,
+			gap: gap,
+			mipObjective: mip_obj,
+			numCallbacks: num_cb,
+			iterationCount: lp.it_cnt,
+			treeInfo: {
+				numActiveNodes: tree.a_cnt,
+				numNodes: tree.n_cnt,
+				totalNodesIncludingRemoved: tree.t_cnt,
+			}
+		});
+
+		return;
+	};
+}
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
