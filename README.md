@@ -24,7 +24,7 @@ This is available as [`convexset:glpk`](https://atmospherejs.com/convexset/glpk)
 
 ## Usage
 
-The general process is to create a web worker, start a solution pass and wait for the result. See the included example Meteor app for a more detailed example or [play with a deployed version](https://glpk.meteor.com).
+The general process is to create a web worker, start a solution pass and wait for the result. See the included example Meteor app for a more detailed example or [play with a deployed version](https://glpk-demo.meteorapp.space).
 
 `GLPK.createWorker(loggingCB, postsolveLoggingCB, completionCB, errorCB, intOptCB)`
  - `loggingCB`: logs messages such as
