@@ -1,6 +1,6 @@
 Package.describe({
 	name: 'convexset:glpk',
-	version: '0.0.3',
+	version: '0.0.3_1',
 	summary: 'GLPK.js wrapped for Meteor',
 	git: 'https://github.com/convexset/meteor-glpk',
 	documentation: '../../README.md'
@@ -13,7 +13,7 @@ Package.onUse(function(api) {
 	api.use(
 		[
 			'ecmascript', 'underscore', 'check', 'ejson',
-			'convexset:package-utils@0.1.9',
+			'convexset:package-utils@0.1.14',
 		]
 	);
 	api.use([], 'server');
