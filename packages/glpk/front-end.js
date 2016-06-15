@@ -1,3 +1,10 @@
+import { checkNpmVersions } from 'meteor/tmeasday:check-npm-versions';
+checkNpmVersions({
+  'package-utils': '^0.2.1'
+});
+const PackageUtilities = require('package-utils');
+
+
 var _glpk = function GLPK() {}
 GLPK = new _glpk();
 
