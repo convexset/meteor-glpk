@@ -1,11 +1,18 @@
+/* global GLPK: true */
+/* global CONSTANTS: true */
+/* global CONSTANT_CLASSES_DICT: true */
+/* global LPX_CONSTANTS: true */
+
 import { checkNpmVersions } from 'meteor/tmeasday:check-npm-versions';
 checkNpmVersions({
-  'package-utils': '^0.2.1'
+  'package-utils': '^0.2.1',
+  'underscore' : '^1.8.3',
 });
 const PackageUtilities = require('package-utils');
+const _ = require('underscore');
 
 
-var _glpk = function GLPK() {}
+var _glpk = function GLPK() {};
 GLPK = new _glpk();
 
 PackageUtilities.addImmutablePropertyValue(GLPK, "MAJOR_VERSION", 4);
@@ -103,7 +110,7 @@ PackageUtilities.addImmutablePropertyFunction(GLPK, "createWorker", function cre
 				_solution = {
 					lp: obj.sol_lp,
 					mip: obj.sol_mip,
-				}
+				};
 				if (_.isFunction(completionCB)) {
 					setTimeout(function() {
 						completionCB(PackageUtilities.deepCopy(_solution));
